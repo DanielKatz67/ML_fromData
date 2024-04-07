@@ -1,0 +1,6 @@
+.Ds_Store
+*.Ds_Store
+*.zip
+.idea*
+project..
+*.personal_copy
