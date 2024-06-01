@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+from matplotlib.colors import ListedColormap
+import matplotlib.pyplot as plt
 
 
 def pearson_correlation(x, y):
@@ -155,7 +157,7 @@ class LogisticRegressionGD(object):
 
         h = self.sigmoid(X.dot(self.theta))
         preds = np.where(h >= 0.5, 1, 0)
-        return preds
+        return np.array(preds).reshape(-1, 1)
 
 def cross_validation(X, y, folds, algo, random_state):
     """
@@ -208,7 +210,7 @@ def cross_validation(X, y, folds, algo, random_state):
 
         # Predict and evaluate
         y_pred = algo.predict(X_val)
-        accuracy = np.sum(y_val == y_pred) / len(y_val)
+        accuracy = np.sum(y_val.reshape(-1, 1) == y_pred) / len(y_val)
         accuracies.append(accuracy)
 
     cv_accuracy = np.mean(accuracies)
@@ -421,7 +423,7 @@ class NaiveBayesGaussian(object):
                 posteriors.append(likelihood_given_cls * self.prior[cls_i])
             # Predict the class with the highest posterior probability
             preds.append(self.classes[np.argmax(posteriors)])
-        return preds
+        return np.array(preds).reshape(-1, 1)
 
     def compute_likelihood_given_cls(self, x, cls_i):
         likelihood_given_cls = 1  # Initialize the likelihood for the current class
@@ -475,10 +477,23 @@ def model_evaluation(x_train, y_train, x_test, y_test, k, best_eta, best_eps):
     bayes_model_test_preds = bayes_model.predict(x_test)
 
     # Training and test accuracies for each model.
-    lor_train_acc = np.sum(lor_model_train_preds == y_train) / len(y_train)
-    lor_test_acc = np.sum(lor_model_test_preds == y_test) / len(y_test)
-    bayes_train_acc = np.sum(bayes_model_train_preds == y_train) / len(y_train)
-    bayes_test_acc = np.sum(bayes_model_test_preds == y_test) / len(y_test)
+    lor_train_acc = np.sum(lor_model_train_preds == y_train.reshape(-1, 1)) / len(y_train)
+    lor_test_acc = np.sum(lor_model_test_preds == y_test.reshape(-1, 1)) / len(y_test)
+    bayes_train_acc = np.sum(bayes_model_train_preds == y_train.reshape(-1, 1)) / len(y_train)
+    bayes_test_acc = np.sum(bayes_model_test_preds == y_test.reshape(-1, 1)) / len(y_test)
+
+
+    # Use the `plot_decision_regions` function to plot the decision boundaries for each model (for this you need to use the training set as the input)
+    data_size = "first 1000 points" if x_train.shape[0] == 1000 else "full data"
+    plot_decision_regions(x_train, y_train, classifier=lor_model, title=f"Logistic regression - {data_size}")
+    plot_decision_regions(x_train, y_train, classifier=bayes_model, title=f"Naive bayes - {data_size}")
+
+    # Plot the cost Vs the iteration number for the Logistic Regression model
+    plt.plot(range(len(lor_model.Js)), lor_model.Js)
+    plt.title(f"Logistic regression - {data_size} - cost as function of iterations")
+    plt.xlabel('Iterations')
+    plt.ylabel('Cost')
+    plt.show()
 
     return {'lor_train_acc': lor_train_acc,
             'lor_test_acc': lor_test_acc,
@@ -520,8 +535,37 @@ def generate_datasets():
 
     dataset_b_features = np.vstack((data_b1, data_b2))
     dataset_b_labels = np.hstack((np.zeros(100), np.ones(100)))
+
     return{'dataset_a_features': dataset_a_features,
            'dataset_a_labels': dataset_a_labels,
            'dataset_b_features': dataset_b_features,
            'dataset_b_labels': dataset_b_labels
            }
+
+# Function for ploting the decision boundaries of a model
+def plot_decision_regions(X, y, classifier, resolution=0.01, title=""):
+    # setup marker generator and color map
+    markers = ('.', '.')
+    colors = ['blue', 'red']
+    cmap = ListedColormap(colors[:len(np.unique(y))])
+    # plot the decision surface
+    x1_min, x1_max = X[:, 0].min() - 1, X[:, 0].max() + 1
+    x2_min, x2_max = X[:, 1].min() - 1, X[:, 1].max() + 1
+    xx1, xx2 = np.meshgrid(np.arange(x1_min, x1_max, resolution),
+                           np.arange(x2_min, x2_max, resolution))
+    Z = classifier.predict(np.array([xx1.ravel(), xx2.ravel()]).T)
+    Z = Z.reshape(xx1.shape)
+    plt.contourf(xx1, xx2, Z, alpha=0.3, cmap=cmap)
+    plt.xlim(xx1.min(), xx1.max())
+    plt.ylim(xx2.min(), xx2.max())
+
+    for idx, cl in enumerate(np.unique(y)):
+        plt.title(title)
+        plt.scatter(x=X[y == cl, 0],
+                    y=X[y == cl, 1],
+                    alpha=0.8,
+                    c=colors[idx],
+                    marker=markers[idx],
+                    label=cl,
+                    edgecolor='black')
+    plt.show()
